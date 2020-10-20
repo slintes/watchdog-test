@@ -1,32 +1,24 @@
 package main
 
 import (
-	"github.com/coreos/go-systemd/daemon"
-	"os"
-	"strconv"
 	"time"
+
+	"github.com/coreos/go-systemd/daemon"
 )
 
 func main() {
 
-
 	healthy := true
 
-	// get the service's watchdof timeout
-	watchdogRefresh := time.Second
-	if watchdogTimeout := os.Getenv("WATCHDOG_USEC"); watchdogTimeout != "" {
-		println("WATCHDOG_USEC: ", watchdogTimeout)
-		if t, err := strconv.Atoi(watchdogTimeout); err == nil {
-			// seems to be good practice to use watchdog / 2
-			// note that the watchdog env var's time unit is microseconds
-			watchdogRefresh = time.Duration(t/2) * time.Microsecond
-		} else {
-			println(err)
-		}
-	} else {
-		println("WATCHDOG_USEC not set?!")
+	// get the service's watchdog timeout
+	var timeout time.Duration
+	var err error
+	if timeout, err = daemon.SdWatchdogEnabled(false); err != nil {
+		panic("watchdog not configured")
 	}
-	println("watchog refesh: ", watchdogRefresh)
+	// recommendation is to notify at least at timeout / 2 period
+	watchdogRefresh := timeout / 2
+	println("watchdog refresh: ", watchdogRefresh)
 
 	go func() {
 		for {
@@ -42,13 +34,13 @@ func main() {
 
 	daemon.SdNotify(false, daemon.SdNotifyReady)
 
-	for i:=0; i<3; i++ {
+	for i := 0; i < 3; i++ {
 		println("healthy... ", i)
 		time.Sleep(5 * time.Second)
 	}
 	// simulate an error
 	healthy = false
-	for i:=0; i<3; i++ {
+	for i := 0; i < 3; i++ {
 		println("unhealthy... ", i)
 		time.Sleep(5 * time.Second)
 	}
